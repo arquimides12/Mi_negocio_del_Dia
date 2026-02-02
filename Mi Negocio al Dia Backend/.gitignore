@@ -1,0 +1,7 @@
+# Ignorar dependencias de ambas carpetas
+**/node_modules/
+**/.expo/
+
+# Ignorar archivos de configuración local
+.env
+.DS_Store
