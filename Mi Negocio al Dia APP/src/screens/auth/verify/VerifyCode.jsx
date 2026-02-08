@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image, Alert } from 'react-native';
 import { styles } from './VerifyCode.styles';
+// IMPORTANTE: Para guardar el ID en la memoria del teléfono
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 export const VerifyCode = ({ route, navigation }) => {
     const { telefono } = route.params || { telefono: 'Desconocido' }; 
@@ -43,14 +45,21 @@ export const VerifyCode = ({ route, navigation }) => {
             const data = await response.json();
 
             if (data.success) {
-                // CAMBIO CLAVE: Pasamos los datos del usuario que vienen del backend
-                // Reemplazamos 'Home' y le enviamos el objeto con los nombres reales
+                // --- PROCESO DE GUARDADO ---
+                // Guardamos el ID (ej: 20) como un String en la memoria
+                await AsyncStorage.setItem('usuarioId', data.user.id.toString());
+                await AsyncStorage.setItem('nombreEmpresa', data.user.nombreEmpresa);
+                await AsyncStorage.setItem('nombreCompleto', data.user.nombreCompleto);
+
+                console.log("Sesión iniciada. ID de Usuario guardado:", data.user.id);
+
+                // Navegamos al Home enviando los datos también por si acaso
                 navigation.replace('Home', { 
                     nombreEmpresa: data.user.nombreEmpresa, 
                     nombreCompleto: data.user.nombreCompleto 
                 }); 
             } else {
-                Alert.alert("Error", data.message || "El código es incorrecto.");
+                Alert.alert("Error", data.mensaje || "El código es incorrecto.");
             }
         } catch (error) {
             console.error(error);

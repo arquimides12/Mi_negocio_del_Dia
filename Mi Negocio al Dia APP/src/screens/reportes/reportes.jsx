@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { styles } from './reportes.styles.jsx'; 
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 export const ReportesScreen = ({ navigation }) => {
     const [productos, setProductos] = useState([]);
@@ -15,26 +16,48 @@ export const ReportesScreen = ({ navigation }) => {
 
     const cargarDatos = async () => {
         try {
-            const res = await fetch('http://192.168.1.18:3000/producto');
-            const data = await res.json();
-            setProductos(data);
+            // 1. Obtenemos el ID del usuario
+            const usuarioId = await AsyncStorage.getItem('usuarioId');
+            
+            // 2. CORREGIDO: Usamos la nueva ruta que agregamos al backend
+            // Es /producto/usuario/ seguido del ID
+            const res = await fetch(`http://192.168.1.18:3000/producto/usuario/${usuarioId}`);
+            
+            // Verificación de seguridad para no intentar leer HTML como JSON
+            if (!res.ok) {
+                console.error("Error en respuesta del servidor:", res.status);
+                setProductos([]);
+                return;
+            }
 
-            const total = data.reduce((acc, p) => acc + ((p.precio_venta - p.precio_compra) * p.cantidad), 0);
+            const data = await res.json();
+            
+            // 3. Validamos que data sea una lista
+            const listaProductos = Array.isArray(data) ? data : [];
+            setProductos(listaProductos);
+
+            // 4. Calculamos ganancia con seguridad
+            const total = listaProductos.reduce((acc, p) => {
+                const precioVenta = Number(p.precio_venta) || 0;
+                const precioCompra = Number(p.precio_compra) || 0;
+                const cantidad = Number(p.cantidad) || 0;
+                return acc + ((precioVenta - precioCompra) * cantidad);
+            }, 0);
+            
             setGananciaTotal(total);
         } catch (e) {
             console.error("Error en reportes:", e);
+            setProductos([]); 
         }
     };
 
-    // --- FUNCIÓN CORREGIDA (UNA SOLA DECLARACIÓN) ---
     const getImagenUrl = (ruta) => {
         if (!ruta) return null;
-        // Limpiamos barras de Windows y barras iniciales en un solo paso
         const rutaLimpia = ruta.replace(/\\/g, '/').replace(/^\/+/, ''); 
         return `http://192.168.1.18:3000/${rutaLimpia}`;
     };
 
-    const stockBajo = productos.filter(p => p.cantidad <= (p.stock_minimo || 15));
+    const stockBajo = (productos || []).filter(p => (Number(p.cantidad) || 0) <= (Number(p.stock_minimo) || 15));
 
     return (
         <View style={styles.container}>
@@ -53,7 +76,7 @@ export const ReportesScreen = ({ navigation }) => {
 
                 <Text style={styles.sectionTitle}>📈 Reportes y Alertas</Text>
                 
-                {stockBajo.length > 0 && (
+                {stockBajo.length > 0 ? (
                     <View>
                         <Text style={styles.alertTitle}>⚠️ ATENCIÓN: STOCK BAJO</Text>
                         {stockBajo.map(item => (
@@ -63,27 +86,32 @@ export const ReportesScreen = ({ navigation }) => {
                             </View>
                         ))}
                     </View>
+                ) : (
+                    <Text style={{ paddingHorizontal: 20, color: 'gray' }}>No hay alertas de stock.</Text>
                 )}
 
-                <Text style={styles.sectionTitle}>Productos disponibles</Text>
-                {productos.map(item => (
-                    <View key={item.id} style={styles.productCard}>
-                        {/* CONTENEDOR DE IMAGEN */}
-                        <View style={styles.imagePlaceholder}>
-                            <Image 
-                                source={item.imagen ? { uri: getImagenUrl(item.imagen) } : require('../../../assets/logo.png')} 
-                                style={styles.img} 
-                                resizeMode="cover"
-                            />
-                        </View>
+                <Text style={styles.sectionTitle}>Resumen de Productos</Text>
+                {productos.length > 0 ? (
+                    productos.map(item => (
+                        <View key={item.id} style={styles.productCard}>
+                            <View style={styles.imagePlaceholder}>
+                                <Image 
+                                    source={item.imagen ? { uri: getImagenUrl(item.imagen) } : require('../../../assets/logo.png')} 
+                                    style={styles.img} 
+                                    resizeMode="cover"
+                                />
+                            </View>
 
-                        <View style={styles.info}>
-                            <Text style={styles.prodName}>{item.nombre}</Text>
-                            <Text style={styles.prodPrice}>Precio: ${item.precio_venta}</Text>
-                            <Text style={styles.prodStock}>Stock actual: {item.cantidad}</Text>
+                            <View style={styles.info}>
+                                <Text style={styles.prodName}>{item.nombre}</Text>
+                                <Text style={styles.prodPrice}>Precio: ${Number(item.precio_venta || 0).toFixed(2)}</Text>
+                                <Text style={styles.prodStock}>Stock actual: {item.cantidad}</Text>
+                            </View>
                         </View>
-                    </View>
-                ))}
+                    ))
+                ) : (
+                    <Text style={{ textAlign: 'center', marginTop: 20 }}>No hay productos registrados.</Text>
+                )}
             </ScrollView>
 
             <TouchableOpacity 

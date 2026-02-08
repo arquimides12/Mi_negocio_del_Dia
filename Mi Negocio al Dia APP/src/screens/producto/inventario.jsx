@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, Image, TouchableOpacity, Alert } from 'react-native';
-// SOLUCIÓN AL ERROR ROJO: Importación con extensión completa
 import { styles } from './inventario.styles.jsx'; 
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 export const InventarioScreen = ({ navigation }) => {
     const [productos, setProductos] = useState([]);
 
-    // Carga los productos cada vez que la pantalla gana el foco
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', () => {
             cargarProductos();
@@ -16,8 +15,15 @@ export const InventarioScreen = ({ navigation }) => {
 
     const cargarProductos = async () => {
         try {
-            // Asegúrate de que tu servidor esté corriendo en esta IP
-            const res = await fetch('http://192.168.1.18:3000/producto');
+            const usuarioId = await AsyncStorage.getItem('usuarioId');
+            
+            if (!usuarioId) {
+                console.error("No se encontró el usuarioId");
+                return;
+            }
+
+            // Usamos la ruta filtrada por usuarioId
+            const res = await fetch(`http://192.168.1.18:3000/producto/usuario/${usuarioId}`);
             const data = await res.json();
             setProductos(data);
         } catch (e) {
@@ -25,6 +31,7 @@ export const InventarioScreen = ({ navigation }) => {
         }
     };
 
+    // --- FUNCIÓN DE ELIMINACIÓN CORREGIDA ---
     const eliminarProducto = (id) => {
         Alert.alert(
             "Eliminar Producto",
@@ -34,21 +41,34 @@ export const InventarioScreen = ({ navigation }) => {
                 { 
                     text: "Eliminar", 
                     style: "destructive", 
-                    onPress: async () => {
-                        try {
-                            const res = await fetch(`http://192.168.1.18:3000/producto/${id}`, { 
-                                method: 'DELETE' 
-                            });
-                            if (res.ok) {
-                                cargarProductos(); // Refresca la lista
-                            }
-                        } catch (e) { 
-                            Alert.alert("Error", "No se pudo eliminar el producto"); 
-                        }
-                    } 
+                    onPress: () => ejecutarEliminacion(id)
                 }
             ]
         );
+    };
+
+    const ejecutarEliminacion = async (id) => {
+        try {
+            // 1. Recuperamos el usuarioId de la memoria local
+            const usuarioId = await AsyncStorage.getItem('usuarioId');
+            
+            // 2. Enviamos el DELETE incluyendo el usuarioId como query param (?usuarioId=...)
+            const res = await fetch(`http://192.168.1.18:3000/producto/${id}?usuarioId=${usuarioId}`, { 
+                method: 'DELETE' 
+            });
+
+            if (res.ok) {
+                Alert.alert("Éxito", "Producto eliminado correctamente");
+                // Filtramos el estado local para borrarlo de la vista sin recargar
+                setProductos(prev => prev.filter(p => p.id !== id));
+            } else {
+                const errorData = await res.json();
+                Alert.alert("Error", errorData.mensaje || "No autorizado para eliminar este producto");
+            }
+        } catch (e) { 
+            console.error("Error al eliminar:", e);
+            Alert.alert("Error", "Error de conexión al intentar eliminar"); 
+        }
     };
 
     const getImagenUrl = (ruta) => {
@@ -59,12 +79,11 @@ export const InventarioScreen = ({ navigation }) => {
 
     return (
         <View style={styles.container}>
-            {/* Cabecera personalizada */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.backArrow}>←</Text>
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>📦 Inventario Real</Text>
+                <Text style={styles.headerTitle}>📦 Mi Inventario</Text>
             </View>
 
             <FlatList
@@ -76,7 +95,7 @@ export const InventarioScreen = ({ navigation }) => {
                             <Image 
                                 source={item.imagen ? { uri: getImagenUrl(item.imagen) } : require('../../../assets/logo.png')} 
                                 style={styles.img} 
-                                key={item.id} // Ayuda a React a no perder la referencia
+                                key={item.id}
                             />
                         </View>
                         
@@ -96,12 +115,11 @@ export const InventarioScreen = ({ navigation }) => {
                 )}
                 ListEmptyComponent={
                     <Text style={{color: '#666', textAlign: 'center', marginTop: 20}}>
-                        No hay productos en el inventario.
+                        No tienes productos registrados.
                     </Text>
                 }
             />
 
-            {/* Botones de acción inferior */}
             <TouchableOpacity 
                 style={styles.btnNuevo} 
                 onPress={() => navigation.navigate("ProductoForm")}

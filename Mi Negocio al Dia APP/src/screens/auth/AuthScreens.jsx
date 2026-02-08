@@ -38,14 +38,15 @@ export const AuthScreens = ({ navigation }) => {
                     </Text>
 
                     <View style={styles.buttonContainer}>
+                        {/* BOTÓN ACTUALIZADO: Te lleva a la interfaz de bienvenida con PIN */}
                         <TouchableOpacity 
                             style={styles.btnPrimary}
-                            onPress={() => console.log("Próximamente Login")}
+                            onPress={() => navigation.navigate('LoginPin')} 
                         >
                             <Text style={styles.textBtnBlack}>INICIAR SESIÓN</Text>
                         </TouchableOpacity>
 
-                        {/* BOTÓN ACTUALIZADO: Salta al formulario de registro */}
+                        {/* BOTÓN: Salta al formulario de registro */}
                         <TouchableOpacity 
                             style={styles.btnSecondary}
                             onPress={() => navigation.navigate('Register')}

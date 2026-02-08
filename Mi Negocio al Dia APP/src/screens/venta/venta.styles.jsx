@@ -3,50 +3,60 @@ import { StyleSheet } from "react-native";
 export const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 10,
-        backgroundColor: '#fff'
+        backgroundColor: '#000', // Fondo negro como el resto de la app
+        padding: 20
     },
     titulo: {
-        fontSize: 18,
+        fontSize: 22,
         fontWeight: 'bold',
-        marginBottom: 10,
-        color: '#2c3e50'
+        marginBottom: 20,
+        color: '#00E5FF', // Cian neón
+        marginTop: 10
     },
     itemProducto: {
-        padding: 15,
-        backgroundColor: '#fff',
-        marginBottom: 8,
-        borderRadius: 8,
-        elevation: 2,
+        padding: 18,
+        backgroundColor: '#1A1A1A', // Gris muy oscuro
+        marginBottom: 12,
+        borderRadius: 15,
         borderWidth: 1,
-        borderColor: '#eee'
+        borderColor: '#333',
+        elevation: 5
     },
     nombreProd: {
         fontWeight: 'bold',
-        fontSize: 16
+        fontSize: 18,
+        color: '#FFF'
     },
     detalleProd: {
-        color: '#27ae60',
-        marginTop: 2
+        color: '#4FC3F7', // Azul claro para el precio
+        marginTop: 5,
+        fontSize: 14
     },
     resumenContainer: {
-        backgroundColor: '#f8f9f9',
-        padding: 15,
-        borderRadius: 10,
+        backgroundColor: '#1A1A1A',
+        padding: 20,
+        borderRadius: 20,
         marginTop: 10,
         borderTopWidth: 2,
-        borderTopColor: '#bdc3c7'
+        borderTopColor: '#00E5FF'
     },
     textoCarrito: {
         fontSize: 16,
+        color: '#BBB',
         fontWeight: 'bold',
         marginBottom: 5
     },
     totalTexto: {
-        fontSize: 24,
+        fontSize: 32,
         textAlign: 'right',
-        color: '#27ae60', // Verde dinero
+        color: '#FFF',
         fontWeight: 'bold',
         marginVertical: 10
+    },
+    btnFinalizar: {
+        padding: 18,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginTop: 5
     }
 });

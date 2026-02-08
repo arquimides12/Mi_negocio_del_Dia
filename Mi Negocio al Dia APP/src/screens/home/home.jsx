@@ -1,14 +1,32 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView } from 'react-native';
 import { styles } from "./home.styles"; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const HomeScreen = ({ navigation, route }) => {
-    // Manejo de parámetros de usuario con valores por defecto
-    const { nombreEmpresa = "Mi Negocio", nombreCompleto = "Usuario" } = route.params || {};
+    // 1. Iniciamos con lo que venga por parámetros o valores por defecto
+    const [nombreEmpresa, setNombreEmpresa] = useState(route.params?.nombreEmpresa || "Mi Negocio");
+    const [nombreCompleto, setNombreCompleto] = useState(route.params?.nombreCompleto || "Usuario");
+
+    // 2. Al cargar, verificamos si hay datos guardados permanentemente
+    useEffect(() => {
+        const cargarDatosPersistentes = async () => {
+            try {
+                const empresaGuardada = await AsyncStorage.getItem('nombreEmpresa');
+                const nombreGuardado = await AsyncStorage.getItem('nombreCompleto');
+                
+                if (empresaGuardada) setNombreEmpresa(empresaGuardada);
+                if (nombreGuardado) setNombreCompleto(nombreGuardado);
+            } catch (error) {
+                console.log("Error leyendo AsyncStorage en Home", error);
+            }
+        };
+        cargarDatosPersistentes();
+    }, []);
 
     return (
         <ScrollView style={styles.container} bounces={false}>
-            {/* ENCABEZADO ESTILO FIGMA */}
+            {/* ENCABEZADO ESTILO FIGMA - SE MANTIENE IGUAL */}
             <View style={styles.header}>
                 <Image 
                     source={require('../../../assets/inicio.png')} 
@@ -42,7 +60,7 @@ export const HomeScreen = ({ navigation, route }) => {
                         <Image source={require('../../../assets/cajaVender.png')} style={styles.menuImage} />
                     </TouchableOpacity>
 
-                    {/* BOTÓN INVENTARIO (CORREGIDO) */}
+                    {/* BOTÓN INVENTARIO */}
                     <TouchableOpacity 
                         style={styles.menuItem}
                         onPress={() => navigation.navigate("Inventario")}

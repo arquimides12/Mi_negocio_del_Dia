@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image, ScrollView, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-// Importación exacta de tus estilos en la misma carpeta
 import { styles } from './producto-form.styles'; 
+// IMPORTANTE: Para saber quién es el dueño del nuevo producto
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 export const ProductoFormScreen = ({ navigation }) => {
     const [form, setForm] = useState({
@@ -16,7 +17,6 @@ export const ProductoFormScreen = ({ navigation }) => {
     const [imagen, setImagen] = useState(null);
 
     const seleccionarImagen = async () => {
-        // CORRECCIÓN DEL WARN: Se usa ['images'] en lugar de MediaTypeOptions
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'], 
             allowsEditing: true,
@@ -34,23 +34,33 @@ export const ProductoFormScreen = ({ navigation }) => {
             return Alert.alert("Campos vacíos", "El nombre, precio de venta y cantidad son obligatorios.");
         }
 
-        const formData = new FormData();
-        formData.append('nombre', form.nombre);
-        formData.append('precio_compra', form.precio_compra || 0);
-        formData.append('precio_venta', form.precio_venta);
-        formData.append('cantidad', form.cantidad);
-        formData.append('stock_minimo', form.stock_minimo || 0);
-        formData.append('descripcion', form.descripcion);
-
-        if (imagen) {
-            const filename = imagen.split('/').pop();
-            const match = /\.(\w+)$/.exec(filename);
-            const type = match ? `image/${match[1]}` : `image`;
-            formData.append('imagen', { uri: imagen, name: filename, type });
-        }
-
         try {
-            // Asegúrate que esta IP sea la de tu máquina actual
+            // 1. Obtenemos el ID del dueño desde el teléfono
+            const usuarioId = await AsyncStorage.getItem('usuarioId');
+            
+            if (!usuarioId) {
+                return Alert.alert("Error de sesión", "No se encontró el ID del usuario. Por favor, reingresa con tu PIN.");
+            }
+
+            // 2. Preparamos el FormData para el envío
+            const formData = new FormData();
+            formData.append('nombre', form.nombre);
+            formData.append('precio_compra', form.precio_compra || 0);
+            formData.append('precio_venta', form.precio_venta);
+            formData.append('cantidad', form.cantidad);
+            formData.append('stock_minimo', form.stock_minimo || 0);
+            formData.append('descripcion', form.descripcion);
+            // PASO CLAVE: Adjuntamos el ID del dueño
+            formData.append('usuarioId', usuarioId); 
+
+            if (imagen) {
+                const filename = imagen.split('/').pop();
+                const match = /\.(\w+)$/.exec(filename);
+                const type = match ? `image/${match[1]}` : `image`;
+                formData.append('imagen', { uri: imagen, name: filename, type });
+            }
+
+            // 3. Enviamos al servidor
             const res = await fetch('http://192.168.1.18:3000/producto', {
                 method: 'POST',
                 body: formData,
@@ -59,9 +69,13 @@ export const ProductoFormScreen = ({ navigation }) => {
 
             if (res.ok) {
                 Alert.alert("Éxito", "Producto creado correctamente");
-                navigation.goBack(); // Regresa al inventario
+                navigation.goBack(); 
+            } else {
+                const errorData = await res.json();
+                Alert.alert("Error", errorData.mensaje || "No se pudo crear el producto");
             }
         } catch (e) {
+            console.error(e);
             Alert.alert("Error de Conexión", "No se pudo alcanzar el servidor.");
         }
     };
@@ -70,7 +84,6 @@ export const ProductoFormScreen = ({ navigation }) => {
         <ScrollView style={styles.container}>
             <Text style={styles.title}>Nuevo Producto</Text>
 
-            {/* Selector de Imagen con tus estilos .jsx */}
             <TouchableOpacity style={styles.imagePicker} onPress={seleccionarImagen}>
                 {imagen ? (
                     <Image source={{ uri: imagen }} style={styles.previewImage} />
