@@ -1,21 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const Usuario = require('../models/usuario'); // Importa el modelo de la DB
+const Usuario = require('../models/usuario');
 
-// 1. RUTA PARA REGISTRAR (Genera el PIN)
+// 1. REGISTRO: Crea usuario y genera PIN de 6 dígitos
 router.post('/registro', async (req, res) => {
     try {
         const { nombreCompleto, telefono, fechaNacimiento, nombreEmpresa } = req.body;
 
-        // Validación de datos recibidos
         if (!telefono || !nombreCompleto) {
-            return res.status(400).json({ success: false, message: "Faltan datos obligatorios" });
+            return res.status(400).json({ success: false, message: "Faltan datos" });
         }
 
-        // Generar código de 6 dígitos
         const codigoPin = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // Crear o actualizar el usuario en la DB
+        // Guarda si es nuevo o actualiza si el teléfono ya existe
         await Usuario.upsert({
             nombreCompleto,
             telefono,
@@ -25,79 +23,57 @@ router.post('/registro', async (req, res) => {
             verificado: false
         });
 
-        console.log("-----------------------------------------");
-        console.log(`NUEVO REGISTRO: ${nombreCompleto}`);
-        console.log(`CÓDIGO PIN PARA ${telefono}: ${codigoPin}`);
-        console.log("-----------------------------------------");
+        console.log(`PIN GENERADO PARA ${nombreCompleto}: ${codigoPin}`);
 
         return res.status(200).json({ 
             success: true, 
-            message: "Código generado exitosamente",
-            debugCode: codigoPin 
+            codigoPin // Se envía para que la App lo muestre al usuario
         });
 
     } catch (error) {
-        console.error("Error en /registro:", error);
-        return res.status(500).json({ success: false, message: "Error interno en el servidor" });
+        console.error("Error registro:", error);
+        return res.status(500).json({ success: false });
     }
 });
 
-// 2. RUTA PARA VERIFICAR (Valida el PIN e incluye los datos del negocio)
+// 2. LOGIN/VERIFICACIÓN: Acceso directo con el PIN
 router.post('/verificar', async (req, res) => {
     try {
-        const { telefono, codigoPin } = req.body;
-        console.log(`Intentando verificar: Tel ${telefono} con PIN ${codigoPin}`);
+        const { codigoPin } = req.body; 
 
-        if (!telefono || !codigoPin) {
-            return res.status(400).json({ success: false, message: "Teléfono o PIN ausentes" });
-        }
-
-        // Buscamos al usuario por su teléfono
-        const usuario = await Usuario.findOne({ where: { telefono } });
+        // Busca al dueño del PIN
+        const usuario = await Usuario.findOne({ 
+            where: { codigoPin: String(codigoPin).trim() } 
+        });
 
         if (!usuario) {
-            console.log("Usuario no encontrado en DB");
-            return res.status(404).json({ success: false, message: "Usuario no registrado" });
+            return res.status(401).json({ success: false, message: "PIN incorrecto" });
         }
 
-        console.log(`PIN en DB: ${usuario.codigoPin} | PIN ingresado: ${codigoPin}`);
-
-        // Comparamos los códigos
-        if (String(usuario.codigoPin).trim() === String(codigoPin).trim()) {
-            await usuario.update({ verificado: true });
-            
-            console.log("¡VALIDACIÓN EXITOSA!");
-            
-            // Devolvemos los datos REALES para que el móvil los muestre
-            return res.status(200).json({ 
-                success: true, 
-                message: "Acceso concedido",
-                user: {
-                    nombreEmpresa: usuario.nombreEmpresa,
-                    nombreCompleto: usuario.nombreCompleto
-                }
-            });
-        } else {
-            console.log("Los códigos NO coinciden");
-            return res.status(401).json({ 
-                success: false, 
-                message: "El código PIN es incorrecto" 
-            });
-        }
+        await usuario.update({ verificado: true });
+        
+        // Retorna el ID para filtrar productos por usuario después
+        return res.status(200).json({ 
+            success: true, 
+            user: {
+                id: usuario.id,
+                nombreEmpresa: usuario.nombreEmpresa,
+                nombreCompleto: usuario.nombreCompleto
+            }
+        });
 
     } catch (error) {
-        console.error("Error en /verificar:", error);
-        return res.status(500).json({ success: false, message: "Error al procesar la verificación" });
+        console.error("Error verificación:", error);
+        return res.status(500).json({ success: false });
     }
 });
 
-// 3. RUTA PARA CONSULTAR USUARIOS
+// 3. LISTADO: Consultar usuarios registrados
 router.get('/usuarios', async (req, res) => {
     try {
         const usuarios = await Usuario.findAll();
         res.json(usuarios);
     } catch (error) {
-        console.error("Error al obtener usuarios:", error);
         res.status(500).json({ message: "Error al obtener usuarios" });
     }
 });

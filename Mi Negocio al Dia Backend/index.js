@@ -2,7 +2,8 @@ const express = require("express");
 const app = express();
 const { sequelize } = require("./models/database");
 const cors = require("cors");
-const path = require("path"); // <--- IMPORTANTE: Necesario para las rutas de archivos
+const path = require("path");
+const fs = require("fs"); // Importado para verificar carpetas
 
 // Importar rutas
 const rutasProducto = require("./routes/producto");
@@ -12,9 +13,15 @@ const rutasAuth = require("./routes/auth");
 app.use(express.json());
 app.use(cors());
 
-// --- ESTA ES LA LÍNEA CLAVE PARA LAS IMÁGENES ---
-// Permite que la App acceda a la carpeta donde se guardan las fotos
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// --- VERIFICACIÓN DE CARPETA UPLOADS ---
+const uploadsPath = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath);
+    console.log("Carpeta 'uploads' creada automáticamente.");
+}
+
+// --- SERVIR IMÁGENES ESTÁTICAS ---
+app.use('/uploads', express.static(uploadsPath));
 
 const PORT = 3000;
 
@@ -29,14 +36,16 @@ app.use('/auth', rutasAuth);
  
 const start = async () => {
     try {
-        // alter: true actualiza la base de datos sin borrar lo que ya tienes
+        // alter: true sincroniza los nuevos campos (usuarioId, imagen) automáticamente
         await sequelize.sync({ alter: true }); 
         console.log("Conexión exitosa a la Base de Datos 'MiNegocioDB'");
-        app.listen(PORT, () => {
+        
+        // Usamos 0.0.0.0 para que sea accesible desde cualquier dispositivo en la red local
+        app.listen(PORT, '0.0.0.0', () => {
             console.log(`Sistema escuchando en: http://192.168.1.18:${PORT}`);
         });
     } catch (error) {
-        console.log("Error al conectar a la base de datos: " + error);
+        console.error("Error al conectar a la base de datos: ", error);
     }          
 };
 
