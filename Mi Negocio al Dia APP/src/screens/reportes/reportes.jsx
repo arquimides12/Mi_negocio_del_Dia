@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const ReportesScreen = ({ navigation }) => {
     const [productos, setProductos] = useState([]);
-    const [gananciaTotal, setGananciaTotal] = useState(0);
+    const [totales, setTotales] = useState({ capitalInvertido: 0, gananciaEstimada: 0 });
 
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', () => {
@@ -16,35 +16,32 @@ export const ReportesScreen = ({ navigation }) => {
 
     const cargarDatos = async () => {
         try {
-            // 1. Obtenemos el ID del usuario
             const usuarioId = await AsyncStorage.getItem('usuarioId');
-            
-            // 2. CORREGIDO: Usamos la nueva ruta que agregamos al backend
-            // Es /producto/usuario/ seguido del ID
             const res = await fetch(`http://192.168.1.18:3000/producto/usuario/${usuarioId}`);
             
-            // Verificación de seguridad para no intentar leer HTML como JSON
             if (!res.ok) {
-                console.error("Error en respuesta del servidor:", res.status);
                 setProductos([]);
                 return;
             }
 
             const data = await res.json();
-            
-            // 3. Validamos que data sea una lista
             const listaProductos = Array.isArray(data) ? data : [];
             setProductos(listaProductos);
 
-            // 4. Calculamos ganancia con seguridad
-            const total = listaProductos.reduce((acc, p) => {
-                const precioVenta = Number(p.precio_venta) || 0;
-                const precioCompra = Number(p.precio_compra) || 0;
-                const cantidad = Number(p.cantidad) || 0;
-                return acc + ((precioVenta - precioCompra) * cantidad);
+            // --- LÓGICA DE NEGOCIO FILTRADA ---
+            // Solo operamos con lo que está 'activo'
+            const productosActivos = listaProductos.filter(p => p.estado === 'activo');
+
+            const capital = productosActivos.reduce((total, p) => {
+                return total + (parseFloat(p.precio_compra) * parseInt(p.cantidad));
             }, 0);
-            
-            setGananciaTotal(total);
+
+            const ganancia = productosActivos.reduce((total, p) => {
+                return total + ((parseFloat(p.precio_venta) - parseFloat(p.precio_compra)) * parseInt(p.cantidad));
+            }, 0);
+
+            setTotales({ capitalInvertido: capital, gananciaEstimada: ganancia });
+
         } catch (e) {
             console.error("Error en reportes:", e);
             setProductos([]); 
@@ -57,7 +54,12 @@ export const ReportesScreen = ({ navigation }) => {
         return `http://192.168.1.18:3000/${rutaLimpia}`;
     };
 
-    const stockBajo = (productos || []).filter(p => (Number(p.cantidad) || 0) <= (Number(p.stock_minimo) || 15));
+    // --- ALERTAS SOLO PARA PRODUCTOS ACTIVOS ---
+    const listaStockBajo = productos.filter(p => {
+        const actual = Number(p.cantidad) || 0;
+        const minimo = Number(p.stock_minimo) || 0;
+        return p.estado === 'activo' && actual <= minimo;
+    });
 
     return (
         <View style={styles.container}>
@@ -69,30 +71,37 @@ export const ReportesScreen = ({ navigation }) => {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Cuadro de Ganancia (Ahora basado solo en Activos) */}
                 <View style={styles.gananciaCard}>
-                    <Text style={styles.gananciaLabel}>Ganancia Estimada Inventario:</Text>
-                    <Text style={styles.gananciaValue}>${gananciaTotal.toFixed(2)}</Text>
+                    <Text style={styles.gananciaLabel}>Ganancia Estimada Activos:</Text>
+                    <Text style={styles.gananciaValue}>${totales.gananciaEstimada.toFixed(2)}</Text>
+                    <Text style={[styles.gananciaLabel, {marginTop: 10}]}>Capital Invertido:</Text>
+                    <Text style={[styles.gananciaValue, {fontSize: 18}]}>${totales.capitalInvertido.toFixed(2)}</Text>
                 </View>
 
-                <Text style={styles.sectionTitle}>📈 Reportes y Alertas</Text>
+                <Text style={styles.sectionTitle}>📈 Alertas de Reposición</Text>
                 
-                {stockBajo.length > 0 ? (
+                {listaStockBajo.length > 0 ? (
                     <View>
-                        <Text style={styles.alertTitle}>⚠️ ATENCIÓN: STOCK BAJO</Text>
-                        {stockBajo.map(item => (
+                        <Text style={styles.alertTitle}>⚠️ ATENCIÓN: COMPRAR PRODUCTOS</Text>
+                        {listaStockBajo.map(item => (
                             <View key={item.id} style={styles.alertCard}>
                                 <Text style={styles.alertName}>{item.nombre}</Text>
-                                <Text style={styles.alertQty}>Quedan: {item.cantidad} unidades</Text>
+                                <Text style={styles.alertQty}>
+                                    Stock Crítico: {item.cantidad} (Mínimo: {item.stock_minimo})
+                                </Text>
                             </View>
                         ))}
                     </View>
                 ) : (
-                    <Text style={{ paddingHorizontal: 20, color: 'gray' }}>No hay alertas de stock.</Text>
+                    <Text style={{ paddingHorizontal: 20, color: 'gray', fontStyle: 'italic' }}>
+                        ✅ Todo en orden. No hay alertas de stock activo.
+                    </Text>
                 )}
 
-                <Text style={styles.sectionTitle}>Resumen de Productos</Text>
-                {productos.length > 0 ? (
-                    productos.map(item => (
+                <Text style={styles.sectionTitle}>Resumen General (Activos)</Text>
+                {productos.filter(p => p.estado === 'activo').length > 0 ? (
+                    productos.filter(p => p.estado === 'activo').map(item => (
                         <View key={item.id} style={styles.productCard}>
                             <View style={styles.imagePlaceholder}>
                                 <Image 
@@ -104,13 +113,15 @@ export const ReportesScreen = ({ navigation }) => {
 
                             <View style={styles.info}>
                                 <Text style={styles.prodName}>{item.nombre}</Text>
-                                <Text style={styles.prodPrice}>Precio: ${Number(item.precio_venta || 0).toFixed(2)}</Text>
-                                <Text style={styles.prodStock}>Stock actual: {item.cantidad}</Text>
+                                <Text style={styles.prodPrice}>P. Venta: ${Number(item.precio_venta).toFixed(2)}</Text>
+                                <Text style={styles.prodStock}>Disponibles: {item.cantidad}</Text>
                             </View>
                         </View>
                     ))
                 ) : (
-                    <Text style={{ textAlign: 'center', marginTop: 20 }}>No hay productos registrados.</Text>
+                    <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>
+                        No hay productos activos actualmente.
+                    </Text>
                 )}
             </ScrollView>
 
@@ -118,7 +129,7 @@ export const ReportesScreen = ({ navigation }) => {
                 style={styles.btnCrear} 
                 onPress={() => navigation.navigate("ProductoForm")}
             >
-                <Text style={styles.btnCrearText}>CREAR PRODUCTO</Text>
+                <Text style={styles.btnCrearText}>AGREGAR NUEVO PRODUCTO</Text>
             </TouchableOpacity>
         </View>
     );

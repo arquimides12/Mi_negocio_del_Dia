@@ -16,13 +16,8 @@ export const InventarioScreen = ({ navigation }) => {
     const cargarProductos = async () => {
         try {
             const usuarioId = await AsyncStorage.getItem('usuarioId');
-            
-            if (!usuarioId) {
-                console.error("No se encontró el usuarioId");
-                return;
-            }
+            if (!usuarioId) return;
 
-            // Usamos la ruta filtrada por usuarioId
             const res = await fetch(`http://192.168.1.18:3000/producto/usuario/${usuarioId}`);
             const data = await res.json();
             setProductos(data);
@@ -31,43 +26,22 @@ export const InventarioScreen = ({ navigation }) => {
         }
     };
 
-    // --- FUNCIÓN DE ELIMINACIÓN CORREGIDA ---
-    const eliminarProducto = (id) => {
-        Alert.alert(
-            "Eliminar Producto",
-            "¿Estás seguro de que deseas eliminar este item del inventario?",
-            [
-                { text: "Cancelar", style: "cancel" },
-                { 
-                    text: "Eliminar", 
-                    style: "destructive", 
-                    onPress: () => ejecutarEliminacion(id)
-                }
-            ]
-        );
-    };
-
-    const ejecutarEliminacion = async (id) => {
+    const cambiarEstado = async (id, nuevoEstado) => {
         try {
-            // 1. Recuperamos el usuarioId de la memoria local
-            const usuarioId = await AsyncStorage.getItem('usuarioId');
-            
-            // 2. Enviamos el DELETE incluyendo el usuarioId como query param (?usuarioId=...)
-            const res = await fetch(`http://192.168.1.18:3000/producto/${id}?usuarioId=${usuarioId}`, { 
-                method: 'DELETE' 
+            const res = await fetch(`http://192.168.1.18:3000/producto/actualizar-estado/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: nuevoEstado })
             });
 
             if (res.ok) {
-                Alert.alert("Éxito", "Producto eliminado correctamente");
-                // Filtramos el estado local para borrarlo de la vista sin recargar
-                setProductos(prev => prev.filter(p => p.id !== id));
+                // Actualización instantánea en la interfaz
+                setProductos(prev => prev.map(p => p.id === id ? { ...p, estado: nuevoEstado } : p));
             } else {
-                const errorData = await res.json();
-                Alert.alert("Error", errorData.mensaje || "No autorizado para eliminar este producto");
+                Alert.alert("Error", "No se pudo actualizar el estado");
             }
-        } catch (e) { 
-            console.error("Error al eliminar:", e);
-            Alert.alert("Error", "Error de conexión al intentar eliminar"); 
+        } catch (e) {
+            console.error("Error al cambiar estado:", e);
         }
     };
 
@@ -89,30 +63,48 @@ export const InventarioScreen = ({ navigation }) => {
             <FlatList
                 data={productos}
                 keyExtractor={item => item.id.toString()}
-                renderItem={({ item }) => (
-                    <View style={styles.card}>
-                        <View style={styles.imagePlaceholder}>
-                            <Image 
-                                source={item.imagen ? { uri: getImagenUrl(item.imagen) } : require('../../../assets/logo.png')} 
-                                style={styles.img} 
-                                key={item.id}
-                            />
-                        </View>
-                        
-                        <View style={styles.info}>
-                            <Text style={styles.nombre}>{item.nombre}</Text>
-                            <Text style={styles.stockLabel}>STOCK ACTUAL</Text>
-                            <Text style={styles.cantidad}>{item.cantidad} unidades</Text>
-                        </View>
+                renderItem={({ item }) => {
+                    const esActivo = item.estado === 'activo';
 
-                        <TouchableOpacity 
-                            style={styles.btnEliminar} 
-                            onPress={() => eliminarProducto(item.id)}
-                        >
-                            <Text style={styles.btnEliminarText}>ELIMINAR</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                    return (
+                        <View style={[
+                            styles.card, 
+                            !esActivo && { opacity: 0.4, backgroundColor: '#e0e0e0' } // Efecto opaco/gris si es pasivo
+                        ]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={styles.imagePlaceholder}>
+                                    <Image 
+                                        source={item.imagen ? { uri: getImagenUrl(item.imagen) } : require('../../../assets/logo.png')} 
+                                        style={styles.img} 
+                                    />
+                                </View>
+                                
+                                <View style={styles.info}>
+                                    <Text style={styles.nombre}>{item.nombre}</Text>
+                                    <Text style={styles.stockLabel}>STOCK ACTUAL</Text>
+                                    <Text style={styles.cantidad}>{item.cantidad} unidades</Text>
+
+                                    {/* BOTÓN INTEGRADO: Debajo de las unidades */}
+                                    <TouchableOpacity 
+                                        onPress={() => cambiarEstado(item.id, esActivo ? 'pasivo' : 'activo')}
+                                        style={{
+                                            backgroundColor: esActivo ? '#00A8C1' : '#666',
+                                            paddingVertical: 6,
+                                            paddingHorizontal: 20,
+                                            borderRadius: 15,
+                                            marginTop: 8,
+                                            alignSelf: 'flex-start',
+                                            elevation: esActivo ? 2 : 0
+                                        }}>
+                                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }}>
+                                            {esActivo ? 'Pasivo' : 'Activo'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                    );
+                }}
                 ListEmptyComponent={
                     <Text style={{color: '#666', textAlign: 'center', marginTop: 20}}>
                         No tienes productos registrados.
