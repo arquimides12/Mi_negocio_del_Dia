@@ -15,16 +15,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// --- NUEVA RUTA PARA REPORTES (CORRIGE EL ERROR <) ---
-// Esta ruta servirá para: http://192.168.1.18:3000/producto/usuario/7
+// --- RUTA PARA REPORTES Y CARGA POR USUARIO ---
 router.get('/usuario/:usuarioId', async (req, res) => {
     try {
         const { usuarioId } = req.params;
-        
         const productos = await Producto.findAll({
             where: { usuarioId: usuarioId }
         });
-
         res.json(productos); 
     } catch (error) {
         console.error("Error al obtener productos por usuario:", error);
@@ -32,15 +29,13 @@ router.get('/usuario/:usuarioId', async (req, res) => {
     }
 });
 
-// 1. OBTENER INVENTARIO: Solo los productos del usuario logueado
+// 1. OBTENER INVENTARIO GENERAL
 router.get("/", async (req, res) => {
     try {
         const { usuarioId } = req.query; 
-        
         if (!usuarioId) {
             return res.status(400).json({ mensaje: "Falta el ID del usuario" });
         }
-
         const productos = await Producto.findAll({
             where: { usuarioId: usuarioId } 
         });
@@ -50,11 +45,10 @@ router.get("/", async (req, res) => {
     }
 });
 
-// 2. CREAR PRODUCTO: Se guarda amarrado al usuarioId
+// 2. CREAR PRODUCTO
 router.post("/", upload.single("imagen"), async (req, res) => {
     try {
         const { nombre, precio_compra, precio_venta, cantidad, stock_minimo, descripcion, usuarioId } = req.body;
-        
         const imagenUrl = req.file ? `uploads/${req.file.filename}` : null;
 
         const producto = await Producto.create({ 
@@ -66,9 +60,9 @@ router.post("/", upload.single("imagen"), async (req, res) => {
             stock_minimo: parseInt(stock_minimo) || 5, 
             descripcion, 
             imagen: imagenUrl,
-            usuarioId: parseInt(usuarioId) 
+            usuarioId: parseInt(usuarioId),
+            estado: 'activo' // Por defecto nace activo
         });
-
         res.status(201).json(producto);
     } catch (error) {
         console.error("Error al crear:", error);
@@ -76,7 +70,7 @@ router.post("/", upload.single("imagen"), async (req, res) => {
     }
 });
 
-// 3. VENDER: Descuenta stock
+// 3. VENDER: Descuenta stock (Mantenemos tu lógica original intacta)
 router.post("/vender", async (req, res) => {
     const { carrito, usuarioId } = req.body;
     try {
@@ -97,7 +91,24 @@ router.post("/vender", async (req, res) => {
     }
 });
 
-// 4. ALERTAS: Stock bajo
+// 4. ACTUALIZAR ESTADO (ACTIVO/PASIVO) - La nueva lógica de negocio
+router.put('/actualizar-estado/:id', async (req, res) => {
+    try {
+        const { estado } = req.body; // Recibe 'activo' o 'pasivo' desde el Front
+        const producto = await Producto.findByPk(req.params.id);
+        
+        if (!producto) return res.status(404).json({ mensaje: "No encontrado" });
+
+        producto.estado = estado;
+        await producto.save();
+        
+        res.json({ mensaje: `Producto marcado como ${estado}`, producto });
+    } catch (error) {
+        res.status(500).json({ mensaje: error.message });
+    }
+});
+
+// 5. ALERTAS: Stock bajo
 router.get("/alertas", async (req, res) => {
     try {
         const { usuarioId } = req.query;
@@ -113,12 +124,11 @@ router.get("/alertas", async (req, res) => {
     }
 });
 
-// 5. ELIMINAR
+// 6. ELIMINAR (Físico)
 router.delete("/:id", async (req, res) => {
     try {
         const { id } = req.params;
         const { usuarioId } = req.query;
-
         const producto = await Producto.findOne({ where: { id, usuarioId } });
         
         if (!producto) {

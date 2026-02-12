@@ -1,21 +1,25 @@
-// models/venta.js
 const { sequelize, DataTypes } = require("./database");
 
 const Venta = sequelize.define("venta", {
   fecha: {
-    type: DataTypes.DATEONLY, // Solo nos interesa el día para las stats
+    type: DataTypes.DATEONLY, 
     defaultValue: DataTypes.NOW
   },
   total_venta: {
     type: DataTypes.FLOAT,
     allowNull: false,
   },
-  ganancia_total: { // Se calcula: (precio_venta - precio_compra) * cantidad
+  ganancia_total: { 
     type: DataTypes.FLOAT,
     allowNull: false,
   },
-  productos_vendidos: { // Guardaremos un JSON simple con el detalle para la factura
+  productos_vendidos: { 
     type: DataTypes.JSON, 
+    allowNull: false
+  },
+  // Agregamos esto explícitamente para que Sequelize no se queje
+  usuarioId: {
+    type: DataTypes.INTEGER,
     allowNull: false
   }
 });

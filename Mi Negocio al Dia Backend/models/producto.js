@@ -11,7 +11,7 @@ const Producto = sequelize.define("producto", {
     allowNull: true,
   },
 
-  // 2. Precios (Usamos FLOAT para decimales)
+  // 2. Precios
   precio_compra: { 
     type: DataTypes.FLOAT,
     allowNull: false,
@@ -29,7 +29,7 @@ const Producto = sequelize.define("producto", {
     allowNull: false,
     defaultValue: 0
   },
-  stock_inicial: { // Para reportes de ganancias
+  stock_inicial: { 
     type: DataTypes.INTEGER,
     allowNull: true
   },
@@ -38,14 +38,22 @@ const Producto = sequelize.define("producto", {
     defaultValue: 5, 
   },
 
-  // 4. Multimedia y Relaciones (Lo que faltaba)
+  // 4. Multimedia y Relaciones
   imagen: { 
     type: DataTypes.STRING,
     allowNull: true,
   },
   usuarioId: { 
     type: DataTypes.INTEGER,
-    allowNull: false, // Obligatorio para que no se mezclen los inventarios
+    allowNull: false,
+  },
+
+  // 5. Lógica de Negocio (Estado)
+  // 'activo': Suma al dinero en reportes y se puede vender.
+  // 'pasivo': Deja de sumar al dinero y se oculta de la venta.
+  estado: {
+    type: DataTypes.ENUM('activo', 'pasivo'),
+    defaultValue: 'activo'
   }
 });
 
